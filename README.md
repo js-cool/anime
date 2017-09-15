@@ -331,7 +331,7 @@ anime({
 <img src="http://animejs.com/documentation/assets/img/readme/value-fb.gif" width="332" />
 
 Same as [function based property parameters](#function-based-property-parameters).<br>
-Get different values for every target of the animation.<br>
+Get different values for every target and property of the animation.<br>
 The function accepts 3 arguments: `target`, `index`, `targetsLength`.
 
 ```javascript

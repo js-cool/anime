@@ -1251,8 +1251,8 @@ begin.update = function(anim) {
   <h3 class="demo-title">播放</h3>
   <div class="demo-content">
     <div class="logs">
-      <input class="log current-time-log"></input>
-      <input class="log progress-log"></input>
+      <input class="log current-time-log" value="not running"></input>
+      <input class="log progress-log" value="progress : 0%"></input>
     </div>
     <div class="large square shadow"></div>
     <div class="large square el"></div>
@@ -1264,17 +1264,13 @@ var run = anime({
   targets: '#run .el',
   translateX: 250,
   delay: 1000,
-  update: function(anim) {
-    if (!anim.began) {
-      runLogEl.value = 'not running';
-    }
-    runProgressLogEl.value = 'progress : ' + Math.round(anim.progress) + '%';
-  },
   run: function(anim) {
     runLogEl.value = 'running';
+    runProgressLogEl.value = 'progress : ' + Math.round(anim.progress) + '%';
   },
   complete: function(anim) {
     runLogEl.value = 'not running';
+    runProgressLogEl.value = 'progress : 100%';
   }
 });
 </script>

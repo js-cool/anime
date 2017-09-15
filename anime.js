@@ -1,7 +1,7 @@
 /**
  * http://animejs.com
  * JavaScript animation engine
- * @version v2.0.2
+ * @version v2.1.0
  * @author Julian Garnier
  * @copyright ©2017 Julian Garnier
  * Released under the MIT license
@@ -43,7 +43,7 @@
     round: 0
   }
 
-  const validTransforms = ['translateX', 'translateY', 'translateZ', 'rotate', 'rotateX', 'rotateY', 'rotateZ', 'scale', 'scaleX', 'scaleY', 'scaleZ', 'skewX', 'skewY'];
+  const validTransforms = ['translateX', 'translateY', 'translateZ', 'rotate', 'rotateX', 'rotateY', 'rotateZ', 'scale', 'scaleX', 'scaleY', 'scaleZ', 'skewX', 'skewY', 'perspective'];
   let transformString;
 
   // Utils
@@ -319,20 +319,16 @@
   // Units
 
   function getUnit(val) {
-    const split = /([\+\-]?[0-9#\.]+)(%|px|pt|em|rem|in|cm|mm|ex|pc|vw|vh|deg|rad|turn)?/.exec(val);
+    const split = /([\+\-]?[0-9#\.]+)(%|px|pt|em|rem|in|cm|mm|ex|pc|vw|vh|deg|rad|turn)?$/.exec(val);
     if (split) return split[2];
   }
 
   function getTransformUnit(propName) {
-    if (stringContains(propName, 'translate')) return 'px';
+    if (stringContains(propName, 'translate') || propName === 'perspective') return 'px';
     if (stringContains(propName, 'rotate') || stringContains(propName, 'skew')) return 'deg';
   }
 
   // Values
-
-  function parseFloatValue(val) {
-    return parseFloat(val);
-  }
 
   function minMaxValue(val, min, max) {
     return Math.min(Math.max(val, min), max);
@@ -385,12 +381,13 @@
   function getRelativeValue(to, from) {
     const operator = /^(\*=|\+=|-=)/.exec(to);
     if (!operator) return to;
-    const x = parseFloatValue(from);
-    const y = parseFloatValue(to.replace(operator[0], ''));
+    const u = getUnit(to) || 0;
+    const x = parseFloat(from);
+    const y = parseFloat(to.replace(operator[0], ''));
     switch (operator[0][0]) {
-      case '+': return x + y;
-      case '-': return x - y;
-      case '*': return x * y;
+      case '+': return x + y + u;
+      case '-': return x - y + u;
+      case '*': return x * y + u;
     }
   }
 
@@ -398,19 +395,71 @@
     if (is.col(val)) return colorToRgb(val);
     const originalUnit = getUnit(val);
     const unitLess = originalUnit ? val.substr(0, arrayLength(val) - arrayLength(originalUnit)) : val;
-    return unit ? unitLess + unit : unitLess;
+    return unit && !/\s/g.test(val) ? unitLess + unit : unitLess;
+  }
+
+  // getTotalLength() equivalent for circle, rect, polyline, polygon and line shapes. 
+  // adapted from https://gist.github.com/SebLambla/3e0550c496c236709744
+
+  function getDistance(p1, p2) {
+    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)); 
+  }
+
+  function getCircleLength(el) {
+    return 2 * Math.PI * el.getAttribute('r');
+  }
+
+  function getRectLength(el) {
+    return (el.getAttribute('width') * 2) + (el.getAttribute('height') * 2);
+  }
+
+  function getLineLength(el) {
+    return getDistance(
+      {x: el.getAttribute('x1'), y: el.getAttribute('y1')}, 
+      {x: el.getAttribute('x2'), y: el.getAttribute('y2')}
+    );
+  }
+
+  function getPolylineLength(el) {
+    const points = el.points;
+    let totalLength = 0;
+    let previousPos;
+    for (let i = 0 ; i < points.numberOfItems; i++) {
+      const currentPos = points.getItem(i);
+      if (i > 0) totalLength += getDistance(previousPos, currentPos);
+      previousPos = currentPos;
+    }
+    return totalLength;
+  }
+
+  function getPolygonLength(el) {
+    const points = el.points;
+    return getPolylineLength(el) + getDistance(points.getItem(points.numberOfItems - 1), points.getItem(0));
+  }
+
+  // Path animation
+
+  function getTotalLength(el) {
+    if (el.getTotalLength) return el.getTotalLength();
+    switch(el.tagName.toLowerCase()) {
+      case 'circle': return getCircleLength(el);
+      case 'rect': return getRectLength(el);
+      case 'line': return getLineLength(el);
+      case 'polyline': return getPolylineLength(el);
+      case 'polygon': return getPolygonLength(el);
+    }
+  }
+
+  function setDashoffset(el) {
+    const pathLength = getTotalLength(el);
+    el.setAttribute('stroke-dasharray', pathLength);
+    return pathLength;
   }
 
   // Motion path
 
   function isPath(val) {
     return is.obj(val) && objectHas(val, 'totalLength');
-  }
-
-  function setDashoffset(el) {
-    const pathLength = el.getTotalLength();
-    el.setAttribute('stroke-dasharray', pathLength);
-    return pathLength;
   }
 
   function getPath(path, percent) {
@@ -420,7 +469,7 @@
       return {
         el: el,
         property: prop,
-        totalLength: el.getTotalLength() * (p / 100)
+        totalLength: getTotalLength(el) * (p / 100)
       }
     }
   }
@@ -448,12 +497,12 @@
     return {
       original: value,
       numbers: value.match(rgx) ? value.match(rgx).map(Number) : [0],
-      strings: value.split(rgx)
+      strings: (is.str(val) || unit) ? value.split(rgx) : []
     }
   }
 
   function recomposeValue(numbers, strings) {
-    return strings.reduce((a, b, i) => a + numbers[i - 1] + b);
+    return (strings.length === 0) ? numbers[0] : strings.reduce((a, b, i) => a + numbers[i - 1] + (b ? b : ' '));
   }
 
   // Animatables
@@ -523,8 +572,8 @@
       }
       t[p] = value;
     }
-    t.duration = parseFloatValue(t.duration);
-    t.delay = parseFloatValue(t.delay);
+    t.duration = parseFloat(t.duration);
+    t.delay = parseFloat(t.delay);
     return t;
   }
 
@@ -663,6 +712,7 @@
       instance.paused = true;
       instance.began = false;
       instance.completed = false;
+      instance.looped = false;
       instance.reversed = direction === 'reverse';
       instance.remaining = direction === 'alternate' && loops === 1 ? 2 : loops;
       for (let i = arrayLength(instance.children); i--; ){
@@ -701,9 +751,9 @@
         const isPath = tween.isPath;
         const round = tween.round;
         const elapsed = minMaxValue(insTime - tween.start - tween.delay, 0, tween.duration) / tween.duration;
-        const eased = tween.easing(elapsed, tween.elasticity);
+        const eased = isNaN(elapsed) ? 1 : tween.easing(elapsed, tween.elasticity);
         const progress = recomposeValue(tween.to.numbers.map((number, p) => {
-          const start = isPath ? 0 : tween.from.numbers[p];
+          const start = isPath || !tween.from.numbers[p] ? 0 : tween.from.numbers[p];
           let value = start + eased * (number - start);
           if (isPath) value = getPathProgress(tween.value, value);
           if (round) value = Math.round(value * round) / round;
@@ -742,27 +792,31 @@
       const insDelay = instance.delay;
       const insCurrentTime = instance.currentTime;
       const insReversed = instance.reversed;
+      if (instance.looped) engineTime += insDelay;
       const insTime = minMaxValue(adjustTime(engineTime), 0, insDuration);
       if (instance.children) syncInstanceChildren(insTime);
+      if (!instance.began && insTime >= insDelay) {
+        instance.began = true;
+        setCallback('begin');
+      }
       if (insTime > insOffset && insTime < insDuration) {
         setAnimationsProgress(insTime);
-        if (!instance.began && insTime >= insDelay) {
-          instance.began = true;
-          setCallback('begin');
-        }
-        setCallback('run');
       } else {
-        if (insTime <= insOffset && insCurrentTime !== 0) {
+        if (!insDuration) countIteration();
+        if (insTime <= insOffset) {
           setAnimationsProgress(0);
-          if (insReversed) countIteration();
+          if (insReversed && insCurrentTime !== 0) countIteration();
         }
-        if (insTime >= insDuration && insCurrentTime !== insDuration) {
+        if (insTime >= insDuration) {
           setAnimationsProgress(insDuration);
-          if (!insReversed) countIteration();
+          if (!insReversed && insCurrentTime !== insDuration) countIteration();
         }
       }
+      setCallback('update');
+      if (insTime >= insDelay) setCallback('run');
       if (engineTime >= insDuration) {
         if (instance.remaining) {
+          if (instance.direction === 'staggered') instance.looped = true;
           startTime = now;
           if (instance.direction === 'alternate') toggleInstanceDirection();
         } else {
@@ -778,7 +832,6 @@
         }
         lastTime = 0;
       }
-      setCallback('update');
     }
 
     instance.tick = function(t) {
@@ -872,7 +925,7 @@
     return tl;
   }
 
-  anime.version = '2.0.2';
+  anime.version = '2.1.0';
   anime.speed = 1;
   anime.running = activeInstances;
   anime.remove = removeTargets;
