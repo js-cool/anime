@@ -31,19 +31,40 @@
       position: relative;
       width: 20px;
       height: 20px;
-      background: white;
+      background: currentColor;
     }
   </style>
 </head>
 <body>
-  <div class="el"></div>
-  <div class="el"></div>
+  <div class="el color-01"></div>
+  <div class="el color-04"></div>
   <script>
-    anime({
-      targets: '.el',
-      translateX: 100,
-      loop: true
+    var seek0 = anime({
+      targets: '.color-01',
+      translateY: [200, 100],
+      loop: true,
+      autoplay: false,
+      update: function() { console.log('update');},
+      begin: function() { console.log('begin');},
+      run: function() { console.log('run');},
+      complete: function() { console.log('complete');}
     });
+    console.log(seek0.currentTime);
+    var duration0 = anime({
+      targets: '.color-04',
+      translateY: [200, 100],
+      loop: true,
+      autoplay: false,
+      duration: 0,
+      update: function() { console.log('update');},
+      begin: function() { console.log('begin');},
+      run: function() { console.log('run');},
+      complete: function() { console.log('complete');}
+    });
+    console.log(duration0.currentTime);
+    // animation.seek(0);
+    // console.log(animation.currentTime);
+
   </script>
   <!-- <script src="../assets/js/stats.js"></script> -->
 </body>

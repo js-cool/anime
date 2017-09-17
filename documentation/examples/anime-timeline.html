@@ -143,7 +143,9 @@
       complete: function() { console.log('noOffset animation 5 completed')}
     });
 
-  var relativeOffset = anime.timeline();
+  var relativeOffset = anime.timeline({
+    autoplay: true
+  });
 
   relativeOffset
     .add({
@@ -187,7 +189,9 @@
       offset: '+=500'
     });
 
-  var absoluteOffset = anime.timeline();
+  var absoluteOffset = anime.timeline({
+    autoplay: true
+  });
 
   absoluteOffset
     .add({
@@ -236,10 +240,15 @@
 
   var multipleTargets = anime.timeline({
     autoplay: false,
-    loop: true,
-    direction: 'normal',
+    direction: 'reverse',
     update: function(anim) {
       controlsProgressEl.value = anim.progress;
+    },
+    begin: function(anim) {
+      console.trace('multiple begin');
+    },
+    complete: function(anim) {
+      console.log('multiple complete');
     }
   });
 

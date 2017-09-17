@@ -704,24 +704,6 @@
 
     let instance = createNewInstance(params);
 
-    instance.reset = function() {
-      const direction = instance.direction;
-      const loops = instance.loop;
-      instance.currentTime = 0;
-      instance.progress = 0;
-      instance.paused = true;
-      instance.began = false;
-      instance.completed = false;
-      instance.looped = false;
-      instance.reversed = direction === 'reverse';
-      instance.remaining = direction === 'alternate' && loops === 1 ? 2 : loops;
-      for (let i = arrayLength(instance.children); i--; ){
-        const child = instance.children[i];
-        child.seek(child.offset); 
-        child.reset();
-      }
-    }
-
     function toggleInstanceDirection() {
       instance.reversed = !instance.reversed;
     }
@@ -794,26 +776,27 @@
       const insReversed = instance.reversed;
       if (instance.looped) engineTime += insDelay;
       const insTime = minMaxValue(adjustTime(engineTime), 0, insDuration);
-      if (instance.children) syncInstanceChildren(insTime);
-      if (!instance.began && insTime >= insDelay) {
-        instance.began = true;
-        setCallback('begin');
+      if (instance.children.length) syncInstanceChildren(insTime);
+      if (insTime >= insDelay) {
+        setCallback('run');
+        if (!instance.began) {
+          instance.began = true;
+          setCallback('begin');
+        }
       }
       if (insTime > insOffset && insTime < insDuration) {
         setAnimationsProgress(insTime);
       } else {
-        if (!insDuration) countIteration();
-        if (insTime <= insOffset) {
+        if (insTime <= insOffset && insCurrentTime !== 0) {
           setAnimationsProgress(0);
-          if (insReversed && insCurrentTime !== 0) countIteration();
+          if (insReversed) countIteration();
         }
-        if (insTime >= insDuration) {
+        if (insTime >= insDuration && insCurrentTime !== insDuration) {
           setAnimationsProgress(insDuration);
-          if (!insReversed && insCurrentTime !== insDuration) countIteration();
+          if (!insReversed) countIteration();
         }
       }
       setCallback('update');
-      if (insTime >= insDelay) setCallback('run');
       if (engineTime >= insDuration) {
         if (instance.remaining) {
           if (instance.direction === 'staggered') instance.looped = true;
@@ -831,6 +814,23 @@
           }
         }
         lastTime = 0;
+      }
+    }
+
+    instance.reset = function() {
+      const direction = instance.direction;
+      const loops = instance.loop;
+      instance.currentTime = 0;
+      instance.progress = 0;
+      instance.paused = true;
+      instance.began = false;
+      instance.completed = false;
+      instance.looped = false;
+      instance.reversed = direction === 'reverse';
+      instance.remaining = direction === 'alternate' && loops === 1 ? 2 : loops;
+      setAnimationsProgress(0);
+      for (let i = arrayLength(instance.children); i--; ){
+        instance.children[i].reset();
       }
     }
 
@@ -911,14 +911,17 @@
         const insOffset = insParams.offset;
         insParams.autoplay = false;
         insParams.offset = is.und(insOffset) ? tlDuration : getRelativeValue(insOffset, tlDuration);
+        tl.began = true;
+        tl.completed = true;
         tl.seek(insParams.offset);
         const ins = anime(insParams);
-        if (ins.duration > tlDuration) tl.duration = ins.duration;
         ins.began = true;
+        ins.completed = true;
+        if (ins.duration > tlDuration) tl.duration = ins.duration;
         tl.children.push(ins);
       });
-      tl.reset();
       tl.seek(0);
+      tl.reset();
       if (tl.autoplay) tl.restart();
       return tl;
     }
