@@ -25,11 +25,12 @@
       position: absolute;
       top: 50%;
       left: 50%;
-      width: 1rem;
-      height: 1rem;
-      margin: -.5rem 0 0 -.5rem;
-      border: 1px solid currentColor;
+      width: 1em;
+      height: 1em;
+      margin: -.5em 0 0 -.5em;
+      border: .0125em solid currentColor;
       /*background-color: currentColor;*/
+      font-size: 10px;
       border-radius: 50%;
       transform: scale(0);
     }
@@ -39,7 +40,7 @@
 <body></body>
 <script>
 
-  var maxElements = Number(location.href.split('?')[1]) || 300;
+  var maxElements = Number(location.href.split('?')[1]) || 500;
   var duration = 2000;
   var toAnimate = [];
   var radius = window.innerWidth < window.innerHeight ? window.innerWidth : window.innerHeight;
@@ -67,7 +68,7 @@
     var angle = i * 4;
     // var delay = ((duration * 2) / maxElements) * i;
     // var angle = i * 1000;
-    var delay = (duration / maxElements) * i * 2;
+    var delay = (duration / maxElements) * i * 10;
     var a = anime({
       targets: el,
       translateX: [0, Math.sin(angle) * distance],

@@ -229,10 +229,6 @@
 
   // Arrays
 
-  function arrayLength(arr) {
-    return arr.length;
-  }
-
   function flattenArray(arr) {
     return arr.reduce((a, b) => a.concat(is.arr(b) ? flattenArray(b) : b), []);
   }
@@ -319,7 +315,7 @@
   // Units
 
   function getUnit(val) {
-    const split = /([\+\-]?[0-9#\.]+)(%|px|pt|em|rem|in|cm|mm|ex|pc|vw|vh|deg|rad|turn)?$/.exec(val);
+    const split = /([\+\-]?[0-9#\.]+)(%|px|pt|em|rem|in|cm|mm|ex|ch|pc|vw|vh|vmin|vmax|deg|rad|turn)?$/.exec(val);
     if (split) return split[2];
   }
 
@@ -366,7 +362,7 @@
       values.push(match[2]);
     }
     const value = values.filter((val, i) => props[i] === propName );
-    return arrayLength(value) ? value[0] : defaultVal;
+    return value.length ? value[0] : defaultVal;
   }
 
   function getOriginalTargetValue(target, propName) {
@@ -394,7 +390,7 @@
   function validateValue(val, unit) {
     if (is.col(val)) return colorToRgb(val);
     const originalUnit = getUnit(val);
-    const unitLess = originalUnit ? val.substr(0, arrayLength(val) - arrayLength(originalUnit)) : val;
+    const unitLess = originalUnit ? val.substr(0, val.length - originalUnit.length) : val;
     return unit && !/\s/g.test(val) ? unitLess + unit : unitLess;
   }
 
@@ -515,7 +511,7 @@
   function getAnimatables(targets) {
     const parsed = parseTargets(targets);
     return parsed.map((t, i) => {
-      return {target: t, id: i, total: arrayLength(parsed)};
+      return {target: t, id: i, total: parsed.length};
     });
   }
 
@@ -524,7 +520,7 @@
   function normalizePropertyTweens(prop, tweenSettings) {
     let settings = cloneObject(tweenSettings);
     if (is.arr(prop)) {
-      const l = arrayLength(prop);
+      const l = prop.length;
       const isFromTo = (l === 2 && !is.obj(prop[0]));
       if (!isFromTo) {
         // Duration divided by the number of tweens
@@ -568,7 +564,7 @@
       let value = getFunctionValue(tween[p], animatable);
       if (is.arr(value)) {
         value = value.map(v => getFunctionValue(v, animatable));
-        if (arrayLength(value) === 1) value = value[0];
+        if (value.length === 1) value = value[0];
       }
       t[p] = value;
     }
@@ -627,7 +623,7 @@
         property: prop.name,
         animatable: animatable,
         tweens: tweens,
-        duration: tweens[arrayLength(tweens) - 1].end,
+        duration: tweens[tweens.length - 1].end,
         delay: tweens[0].delay
       }
     }
@@ -645,7 +641,7 @@
 
   function getInstanceTimings(type, animations, tweenSettings) {
     const math = (type === 'delay') ? Math.min : Math.max;
-    return arrayLength(animations) ? math.apply(Math, animations.map(anim => anim[type])) : tweenSettings[type];
+    return animations.length ? math.apply(Math, animations.map(anim => anim[type])) : tweenSettings[type];
   }
 
   function createNewInstance(params) {
@@ -671,7 +667,7 @@
   const engine = (() => {
     function play() { raf = requestAnimationFrame(step); };
     function step(t) {
-      const activeLength = arrayLength(activeInstances);
+      const activeLength = activeInstances.length;
       if (activeLength) {
         let i = 0;
         while (i < activeLength) {
@@ -715,9 +711,9 @@
     function syncInstanceChildren(time) {
       const children = instance.children;
       if (time >= instance.currentTime) {
-        for (let i = 0; i < arrayLength(children); i++) children[i].seek(time);
+        for (let i = 0; i < children.length; i++) children[i].seek(time);
       } else {
-        for (let i = arrayLength(children); i--;) children[i].seek(time);
+        for (let i = children.length; i--;) children[i].seek(time);
       }
     }
 
@@ -725,19 +721,18 @@
       let i = 0;
       let transforms = {};
       const animations = instance.animations;
-      while (i < arrayLength(animations)) {
+      while (i < animations.length) {
         const anim = animations[i];
         const animatable = anim.animatable;
         const tweens = anim.tweens;
-        const tween = tweens.filter(t => (insTime < t.end))[0] || tweens[arrayLength(tweens) - 1];
-        const isPath = tween.isPath;
-        const round = tween.round;
+        const tween = tweens.filter(t => (insTime < t.end))[0] || tweens[tweens.length - 1];
         const elapsed = minMaxValue(insTime - tween.start - tween.delay, 0, tween.duration) / tween.duration;
         const eased = isNaN(elapsed) ? 1 : tween.easing(elapsed, tween.elasticity);
+        const round = tween.round;
         const progress = recomposeValue(tween.to.numbers.map((number, p) => {
-          const start = isPath || !tween.from.numbers[p] ? 0 : tween.from.numbers[p];
+          const start = tween.from.numbers[p];
           let value = start + eased * (number - start);
-          if (isPath) value = getPathProgress(tween.value, value);
+          if (tween.isPath) value = getPathProgress(tween.value, value);
           if (round) value = Math.round(value * round) / round;
           return value;
         }), tween.to.strings);
@@ -774,8 +769,7 @@
       const insDelay = instance.delay;
       const insCurrentTime = instance.currentTime;
       const insReversed = instance.reversed;
-      if (instance.looped) engineTime += insDelay;
-      const insTime = minMaxValue(adjustTime(engineTime), 0, insDuration);
+      const insTime = adjustTime(engineTime);
       if (instance.children.length) syncInstanceChildren(insTime);
       if (insTime >= insDelay) {
         setCallback('run');
@@ -799,18 +793,17 @@
       setCallback('update');
       if (engineTime >= insDuration) {
         if (instance.remaining) {
-          if (instance.direction === 'staggered') instance.looped = true;
           startTime = now;
           if (instance.direction === 'alternate') toggleInstanceDirection();
         } else {
           instance.pause();
-          if ('Promise' in window) {
-            resolve();
-            promise = makePromise();
-          }
           if (!instance.completed) {
             instance.completed = true;
             setCallback('complete');
+            if ('Promise' in window) {
+              resolve();
+              promise = makePromise();
+            }
           }
         }
         lastTime = 0;
@@ -825,11 +818,10 @@
       instance.paused = true;
       instance.began = false;
       instance.completed = false;
-      instance.looped = false;
       instance.reversed = direction === 'reverse';
       instance.remaining = direction === 'alternate' && loops === 1 ? 2 : loops;
       setAnimationsProgress(0);
-      for (let i = arrayLength(instance.children); i--; ){
+      for (let i = instance.children.length; i--; ){
         instance.children[i].reset();
       }
     }
@@ -886,13 +878,13 @@
 
   function removeTargets(targets) {
     const targetsArray = parseTargets(targets);
-    for (let i = arrayLength(activeInstances); i--;) {
+    for (let i = activeInstances.length; i--;) {
       const instance = activeInstances[i];
       const animations = instance.animations;
-      for (let a = arrayLength(animations); a--;) {
+      for (let a = animations.length; a--;) {
         if (arrayContains(targetsArray, animations[a].animatable.target)) {
           animations.splice(a, 1);
-          if (!arrayLength(animations)) instance.pause();
+          if (!animations.length) instance.pause();
         }
       }
     }
@@ -905,8 +897,10 @@
     tl.pause();
     tl.duration = 0;
     tl.add = function(instancesParams) {
-      tl.children.forEach( i => { i.began = true; i.completed = true; });
-      toArray(instancesParams).forEach(insParams => {
+      tl.children.forEach(i => { i.began = true; i.completed = true; });
+      toArray(instancesParams).forEach(instanceParams => {
+        let insParams = mergeObjects(instanceParams, replaceObjectProps(defaultTweenSettings, params || {}));
+        insParams.targets = insParams.targets || params.targets;
         const tlDuration = tl.duration;
         const insOffset = insParams.offset;
         insParams.autoplay = false;

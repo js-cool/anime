@@ -922,6 +922,48 @@ timelineParameters
 </script>
 </div>
 
+<div id="TLParamsInheritance" class="demo">
+  <h3 class="demo-title">Parameters inheritance</h3>
+  <div class="demo-content">
+    <div class="line">
+      <div class="square shadow"></div>
+      <div class="square el"></div>
+    </div>
+    <div class="line">
+      <div class="circle shadow"></div>
+      <div class="circle el"></div>
+    </div>
+    <div class="line">
+      <div class="triangle shadow"></div>
+      <div class="triangle el"></div>
+    </div>
+  </div>
+<script>var TLParamsInheritance = anime.timeline({
+  targets: '#TLParamsInheritance .el',
+  delay: function(el, i) { return i * 200 },
+  duration: 500,
+  easing: 'easeOutExpo',
+  direction: 'alternate',
+  loop: true
+});
+
+TLParamsInheritance
+  .add({
+    translateX: 250,
+  })
+  .add({
+    opacity: .5,
+    translateX: 250,
+    scale: 2,
+  })
+  .add({
+    translateX: 0,
+    scale: 1
+  });
+
+</script>
+</div>
+
 </article>
 <!-- -->
 
